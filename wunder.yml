@@ -1,0 +1,181 @@
+name: wunder
+version: "0.0.0"
+author: Your Name <your@email.com>
+about: Describe your extension
+base_endpoint: https://a.wunderlist.com/api/v1/
+oauth:
+    client_id: "{{env.WUNDER_CLIENT_ID}}"
+    client_secret: "{{env.WUNDER_CLIENT_SECRET}}"
+    auth_url: https://www.wunderlist.com/oauth/authorize
+    token_url: https://www.wunderlist.com/oauth/access_token
+    header_key: X-Access-Token
+headers:
+    X-Client-ID: "{{env.WUNDER_CLIENT_ID}}"
+vars:
+    query_param: q
+subcommands:
+    - lists:
+        about: get lists
+        path: lists
+        args:
+            - template:
+                short: t
+                long: template
+                help: Use a different template
+                required: false
+                takes_value: true
+        response_template: json.j2
+    - list_id:
+        about: get list by id
+        path: lists/{{args.LIST_ID}}
+        args:
+            - LIST_ID:
+                help: List id
+                required: true
+        response_template: json.j2
+    - tasks_id:
+        about: get tasks by list id
+        path: tasks
+        query_params:
+            list_id: "{{args.LIST_ID}}"
+            completed: "{% if args.completed is defined %}true{% else %}false{% endif %}"
+        args:
+            - LIST_ID:
+                help: List id
+                required: true
+            - template:
+                short: t
+                long: template
+                help: Use a different template
+                required: false
+                takes_value: true
+            - completed:
+                short: c
+                long: completed
+                help: List completed tasks
+                required: false
+        response_template: json.j2
+    - update_task:
+        about: update task
+        path: tasks/{{args.TASK_ID}}
+        method: PATCH
+        args:
+            - REVISION:
+                help: Wunderlist revision
+                required: true
+            - TASK_ID:
+                help: Task id
+                required: true
+            - completed:
+                short: c
+                long: completed
+                help: Mark the task as completed
+                required: false
+            - title:
+                short: t
+                long: title
+                help: Change task title
+                required: false
+                takes_value: true
+        body:
+            completed: "{% if args.completed is defined %}true{% else %}false{% endif %}"
+            revision: "{{args.REVISION}}"
+            title: "{% if args.title is defined %}{{ args.title }}{% else %}[[empty]]{% endif %}"
+        response_template: json.j2
+    - todo:
+        about: create a task
+        path: tasks
+        method: POST
+        args:
+            - list_id:
+                short: l
+                long: list_id
+                help: List id
+                required: false
+                takes_value: true
+            - TITLE:
+                help: What to do?
+                required: true
+        body:
+            list_id: "{% if args.list_id is defined %}{{args.list_id}}{% else %}{{env.WUNDER_LIST_ID}}{% endif %}"
+            title: "{% if args.TITLE is defined %}{{ args.TITLE }}{% else %}[[empty]]{% endif %}"
+        response_template: json.j2
+    # Scripts
+    - list:
+        about: get list by name
+        args:
+            - LIST_TITLE:
+                help: List title
+                required: true
+        script: |
+            wunder lists | jq 'map(select(.title | test("{{args.LIST_TITLE}}";"i")))|.[0]'
+    - tasks:
+        about: get tasks for list
+        args:
+            - LIST_TITLE:
+                help: List title
+                required: false
+            - raw:
+                help: print as json 
+                short: r
+                long: raw
+            - completed:
+                short: c
+                long: completed
+                help: List completed tasks
+        script: |
+            {% if args.LIST_TITLE is defined %}
+                LIST_ID=$(wunder list {{args.LIST_TITLE}} | jq '.id' | sed 's/"//g')
+            {% elif env.WUNDER_LIST_ID is defined %}
+                LIST_ID="{{env.WUNDER_LIST_ID}}"
+            {% else %}
+                echo "No list id provided"
+                exit 1
+            {% endif %}
+
+            {% if args.completed is defined %}
+                {% set completed = "-c" %}
+            {% else %}
+                {% set completed = "" %}
+            {% endif %}
+
+            {% if args.raw is defined %}
+                wunder tasks_id {{completed}} $LIST_ID
+            {% else %}
+                wunder tasks_id {{completed}} $LIST_ID | jq -r 'map(.title) | .[]'
+            {% endif %}
+    - done:
+        about: mark a task as done
+        args:
+            - TASK:
+                help: A substring of the task text (it will match the first one)
+                required: true
+            - list_id:
+                short: -l
+                long: list_id
+                required: false
+                takes_value: true
+        script: |
+            TASKS=$(wunder tasks -r {% if args.list_id is defined %}{{args.list_id}}{% endif %})
+            TASK=$(echo "$TASKS" | jq 'map(select(.title | test("{{args.TASK}}";"i")))|.[0]')
+            TASK_ID=$(echo "$TASK" | jq -r '.id')
+            TASK_REVISION=$(echo "$TASK" | jq -r '.revision')
+            wunder update_task -c $TASK_REVISION $TASK_ID
+    - undo:
+        about: mark a task as done
+        args:
+            - TASK:
+                help: A substring of the task text (it will match the first one)
+                required: true
+            - list_id:
+                short: -l
+                long: list_id
+                required: false
+                takes_value: true
+        script: |
+            set -x
+            TASKS=$(wunder tasks -r -c {% if args.list_id is defined %}{{args.list_id}}{% endif %})
+            TASK=$(echo "$TASKS" | jq 'map(select(.title | test("{{args.TASK}}";"i")))|.[0]')
+            TASK_ID=$(echo "$TASK" | jq -r '.id')
+            TASK_REVISION=$(echo "$TASK" | jq -r '.revision')
+            wunder update_task $TASK_REVISION $TASK_ID
