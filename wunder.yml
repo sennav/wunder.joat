@@ -82,7 +82,7 @@ subcommands:
             revision: "{{args.REVISION}}"
             title: "{% if args.title is defined %}{{ args.title }}{% else %}[[empty]]{% endif %}"
         response_template: json.j2
-    - todo:
+    - create_task:
         about: create a task
         path: tasks
         method: POST
@@ -97,10 +97,16 @@ subcommands:
                 help: What to do?
                 required: true
         body:
-            list_id: "{% if args.list_id is defined %}{{args.list_id}}{% else %}{{env.WUNDER_LIST_ID}}{% endif %}"
+            list_id: >-
+                {% if args.list_id is defined %}
+                    {{args.list_id}}
+                {% else %}
+                    {{env.WUNDER_LIST_ID}}
+                {% endif %}
             title: "{% if args.TITLE is defined %}{{ args.TITLE }}{% else %}[[empty]]{% endif %}"
         response_template: json.j2
-    # Scripts
+
+# Scripts
     - list:
         about: get list by name
         args:
@@ -109,9 +115,41 @@ subcommands:
                 required: true
         script: |
             wunder lists | jq 'map(select(.title | test("{{args.LIST_TITLE}}";"i")))|.[0]'
+
+    - todo:
+        about: create a task
+        path: tasks
+        method: POST
+        args:
+            - list_id:
+                short: l
+                long: list_id
+                help: List id
+                required: false
+                takes_value: true
+            - TITLE:
+                help: What to do?
+                required: true
+            - LIST:
+                help: List to add to (substring case insensitive)
+                required: true
+        script: |
+            {% if args.list_id is defined %}
+                LIST_ID="{{args.list_id}}"
+            {% elif args.LIST is defined %}
+                LIST_ID=$(wunder list {{args.LIST}} | jq -r '.id')
+            {% else %}
+                LIST_ID="{{env.WUNDER_LIST_ID}}"
+            {% endif %}
+            wunder create_task -l "$LIST_ID" "{{args.TITLE}}"
+        response_template: json.j2
+
     - tasks:
         about: get tasks for list
         args:
+            - LIST:
+                help: List title
+                required: false
             - LIST_TITLE:
                 help: List title
                 required: false
@@ -125,7 +163,9 @@ subcommands:
                 help: List completed tasks
         script: |
             {% if args.LIST_TITLE is defined %}
-                LIST_ID=$(wunder list {{args.LIST_TITLE}} | jq '.id' | sed 's/"//g')
+                LIST_ID=$(wunder list {{args.LIST_TITLE}} | jq -r '.id')
+            {% elif args.LIST is defined %}
+                LIST_ID=$(wunder list {{args.LIST}} | jq -r '.id')
             {% elif env.WUNDER_LIST_ID is defined %}
                 LIST_ID="{{env.WUNDER_LIST_ID}}"
             {% else %}
