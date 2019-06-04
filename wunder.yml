@@ -132,7 +132,7 @@ subcommands:
                 required: true
             - LIST:
                 help: List to add to (substring case insensitive)
-                required: true
+                required: false
         script: |
             {% if args.list_id is defined %}
                 LIST_ID="{{args.list_id}}"
