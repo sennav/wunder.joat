@@ -17,14 +17,6 @@ subcommands:
     - lists:
         about: get lists
         path: lists
-        args:
-            - template:
-                short: t
-                long: template
-                help: Use a different template
-                required: false
-                takes_value: true
-        response_template: json.j2
     - list_id:
         about: get list by id
         path: lists/{{args.LIST_ID}}
@@ -32,7 +24,6 @@ subcommands:
             - LIST_ID:
                 help: List id
                 required: true
-        response_template: json.j2
     - tasks_id:
         about: get tasks by list id
         path: tasks
@@ -43,18 +34,11 @@ subcommands:
             - LIST_ID:
                 help: List id
                 required: true
-            - template:
-                short: t
-                long: template
-                help: Use a different template
-                required: false
-                takes_value: true
             - completed:
                 short: c
                 long: completed
                 help: List completed tasks
                 required: false
-        response_template: json.j2
     - update_task:
         about: update task
         path: tasks/{{args.TASK_ID}}
@@ -72,7 +56,7 @@ subcommands:
                 help: Mark the task as completed
                 required: false
             - title:
-                short: t
+                short: T
                 long: title
                 help: Change task title
                 required: false
@@ -81,7 +65,6 @@ subcommands:
             completed: "{% if args.completed is defined %}true{% else %}false{% endif %}"
             revision: "{{args.REVISION}}"
             title: "{% if args.title is defined %}{{ args.title }}{% else %}[[empty]]{% endif %}"
-        response_template: json.j2
     - create_task:
         about: create a task
         path: tasks
@@ -104,7 +87,6 @@ subcommands:
                     {{env.WUNDER_LIST_ID}}
                 {% endif %}
             title: "{% if args.TITLE is defined %}{{ args.TITLE }}{% else %}[[empty]]{% endif %}"
-        response_template: json.j2
 
 # Scripts
     - list:
@@ -142,7 +124,6 @@ subcommands:
                 LIST_ID="{{env.WUNDER_LIST_ID}}"
             {% endif %}
             wunder create_task -l "$LIST_ID" "{{args.TITLE}}"
-        response_template: json.j2
 
     - tasks:
         about: get tasks for list
