@@ -135,7 +135,7 @@ subcommands:
                 help: List title
                 required: false
             - raw:
-                help: print as json 
+                help: print as json
                 short: r
                 long: raw
             - completed:
@@ -194,7 +194,6 @@ subcommands:
                 required: false
                 takes_value: true
         script: |
-            set -x
             TASKS=$(wunder tasks -r -c {% if args.list_id is defined %}{{args.list_id}}{% endif %})
             TASK=$(echo "$TASKS" | jq 'map(select(.title | test("{{args.TASK}}";"i")))|.[0]')
             TASK_ID=$(echo "$TASK" | jq -r '.id')
