@@ -95,8 +95,17 @@ subcommands:
             - LIST_TITLE:
                 help: List title
                 required: true
+            - complete:
+                short: c
+                long: complete
+                help: Return the entire list json
+                required: false
         script: |
-            wunder lists | jq 'map(select(.title | test("{{args.LIST_TITLE}}";"i")))|.[0]'
+            {% if args.complete is defined %}
+                wunder lists | jq 'map(select(.title | test("{{args.LIST_TITLE}}";"i"))) | .[0]'
+            {% else %}
+                wunder lists | jq -r 'map(select(.title | test("{{args.LIST_TITLE}}";"i"))) | .[0] | .id'
+            {% endif %}
 
     - todo:
         about: create a task
@@ -106,20 +115,20 @@ subcommands:
             - list_id:
                 short: l
                 long: list_id
-                help: List id
+                help: List id, ignored if list title is defined
                 required: false
                 takes_value: true
             - TITLE:
                 help: What to do?
                 required: true
-            - LIST:
+            - LIST_TITLE:
                 help: List to add to (substring case insensitive)
                 required: false
         script: |
-            {% if args.list_id is defined %}
+            {% if args.LIST_TITLE is defined %}
+                LIST_ID=$(wunder list {{args.LIST_TITLE}})
+            {% elif args.list_id is defined %}
                 LIST_ID="{{args.list_id}}"
-            {% elif args.LIST is defined %}
-                LIST_ID=$(wunder list {{args.LIST}} | jq -r '.id')
             {% else %}
                 LIST_ID="{{env.WUNDER_LIST_ID}}"
             {% endif %}
@@ -128,12 +137,15 @@ subcommands:
     - tasks:
         about: get tasks for list
         args:
-            - LIST:
-                help: List title
-                required: false
             - LIST_TITLE:
                 help: List title
                 required: false
+            - list_id:
+                short: -l
+                long: list_id
+                help: Optional list id, ignored if there's a list title
+                required: false
+                takes_value: true
             - raw:
                 help: print as json
                 short: r
@@ -144,9 +156,9 @@ subcommands:
                 help: List completed tasks
         script: |
             {% if args.LIST_TITLE is defined %}
-                LIST_ID=$(wunder list {{args.LIST_TITLE}} | jq -r '.id')
-            {% elif args.LIST is defined %}
-                LIST_ID=$(wunder list {{args.LIST}} | jq -r '.id')
+                LIST_ID=$(wunder list {{args.LIST_TITLE}})
+            {% elif args.list_id is defined %}
+                LIST_ID="{{args.list_id}}"
             {% elif env.WUNDER_LIST_ID is defined %}
                 LIST_ID="{{env.WUNDER_LIST_ID}}"
             {% else %}
@@ -171,13 +183,23 @@ subcommands:
             - TASK:
                 help: A substring of the task text (it will match the first one)
                 required: true
+            - LIST_NAME:
+                help: Optional list name (substring case insensitive)
+                required: false
             - list_id:
                 short: -l
                 long: list_id
                 required: false
                 takes_value: true
         script: |
-            TASKS=$(wunder tasks -r {% if args.list_id is defined %}{{args.list_id}}{% endif %})
+            {% if args.list_id is defined -%}
+                TASKS=$(wunder tasks -r {{args.list_id}})
+            {% elif args.LIST_NAME is defined %}
+                LIST_ID=$(wunder list {{args.LIST_NAME}})
+                TASKS=$(wunder tasks -r -l "$LIST_ID")
+            {% elif env.WUNDER_LIST_ID is defined %}
+                TASKS=$(wunder tasks -r -l {{env.WUNDER_LIST_ID}})
+            {% endif %}
             TASK=$(echo "$TASKS" | jq 'map(select(.title | test("{{args.TASK}}";"i")))|.[0]')
             TASK_ID=$(echo "$TASK" | jq -r '.id')
             TASK_REVISION=$(echo "$TASK" | jq -r '.revision')
