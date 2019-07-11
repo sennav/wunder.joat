@@ -82,7 +82,7 @@ subcommands:
             revision: "{{args.REVISION}}"
             title: "{% if args.title is defined %}{{ args.title }}{% else %}[[empty]]{% endif %}"
     - create_task:
-        about: create a task request
+        about: perform a task request
         path: tasks
         method: POST
         args:
@@ -102,6 +102,20 @@ subcommands:
                 {%- else -%}
                     {{env.WUNDER_LIST_ID}}
                 {%- endif -%}
+            title: "{{ args.TITLE }}"
+    - create_subtask:
+        about: perform a subtask request
+        path: subtasks
+        method: POST
+        args:
+            - TASK_ID:
+                help: Task id
+                required: true
+            - TITLE:
+                help: What to do?
+                required: true
+        body:
+            task_id: "{{args.TASK_ID}}"
             title: "{% if args.TITLE is defined %}{{ args.TITLE }}{% else %}[[empty]]{% endif %}"
     - subtasks:
         about: list subtasks
@@ -148,7 +162,7 @@ subcommands:
                 required: false
         script: |
             {% if args.complete is defined %}
-                wunder lists | jq 'map(select(.title | test("{{args.LIST_TITLE}}";"i"))) | .[0]'
+                wunder lists | jq -r 'map(select(.title | test("{{args.LIST_TITLE}}";"i"))) | .[0]'
             {% else %}
                 wunder lists | jq -r 'map(select(.title | test("{{args.LIST_TITLE}}";"i"))) | .[0] | .id'
             {% endif %}
@@ -177,6 +191,37 @@ subcommands:
                 LIST_ID="{{env.WUNDER_LIST_ID}}"
             {% endif %}
             wunder create_task -l "$LIST_ID" "{{args.TITLE}}"
+
+    - subtask:
+        about: create a subtask
+        args:
+            - list_id:
+                short: l
+                long: list_id
+                help: List id, ignored if list title is defined
+                required: false
+                takes_value: true
+            - TASK_TITLE:
+                help: Substring of the task title (it will match the first)
+                required: true
+            - TITLE:
+                help: What to do?
+                required: true
+            - LIST_TITLE:
+                help: List to add to (substring case insensitive)
+                required: false
+        script: |
+            {% if args.LIST_TITLE is defined %}
+                LIST_ID=$(wunder list {{args.LIST_TITLE}})
+            {% elif args.list_id is defined %}
+                LIST_ID="{{args.list_id}}"
+            {% else %}
+                LIST_ID="{{env.WUNDER_LIST_ID}}"
+            {% endif %}
+
+            TASK_ID=$(wunder tasks_id "$LIST_ID" | jq -r 'map(select(.title | test("{{args.TASK_TITLE}}";"i"))) | .[0] | .id')
+
+            wunder create_subtask "$TASK_ID" "{{args.TITLE}}"
 
     - tasks:
         about: get tasks for list
