@@ -14,6 +14,7 @@ headers:
 vars:
     query_param: q
 subcommands:
+# Requests
     - lists:
         about: get lists
         path: lists
@@ -28,12 +29,17 @@ subcommands:
         about: get tasks by list id
         path: tasks
         query_params:
-            list_id: "{{args.LIST_ID}}"
             completed: "{% if args.completed is defined %}true{% else %}false{% endif %}"
+            list_id: |
+                {%- if args.LIST_ID is defined -%}
+                    {{args.LIST_ID}}
+                {%- else -%}
+                    {{env.WUNDER_LIST_ID}}
+                {%- endif -%}
         args:
             - LIST_ID:
                 help: List id
-                required: true
+                required: false
             - completed:
                 short: c
                 long: completed
@@ -41,7 +47,12 @@ subcommands:
                 required: false
     - update_task:
         about: update task
-        path: tasks/{{args.TASK_ID}}
+        path: |
+            {%- if args.subtask is not defined-%}
+                tasks/{{args.TASK_ID}}
+            {%- else -%}
+                subtasks/{{args.TASK_ID}}
+            {%- endif -%}
         method: PATCH
         args:
             - REVISION:
@@ -61,12 +72,17 @@ subcommands:
                 help: Change task title
                 required: false
                 takes_value: true
+            - subtask:
+                short: s
+                long: subtask
+                help: Mark a subtask as done
+                required: false
         body:
             completed: "{% if args.completed is defined %}true{% else %}false{% endif %}"
             revision: "{{args.REVISION}}"
             title: "{% if args.title is defined %}{{ args.title }}{% else %}[[empty]]{% endif %}"
     - create_task:
-        about: create a task
+        about: create a task request
         path: tasks
         method: POST
         args:
@@ -80,13 +96,43 @@ subcommands:
                 help: What to do?
                 required: true
         body:
-            list_id: >-
-                {% if args.list_id is defined %}
+            list_id: |
+                {%- if args.list_id is defined -%}
                     {{args.list_id}}
-                {% else %}
+                {%- else -%}
                     {{env.WUNDER_LIST_ID}}
-                {% endif %}
+                {%- endif -%}
             title: "{% if args.TITLE is defined %}{{ args.TITLE }}{% else %}[[empty]]{% endif %}"
+    - subtasks:
+        about: list subtasks
+        path: subtasks
+        method: GET
+        args:
+            - list_id:
+                short: l
+                long: list_id
+                help: List id
+                required: false
+                takes_value: true
+            - task_id:
+                short: T
+                long: tasks_id
+                help: Task id (using this ignores list_id)
+                required: false
+                takes_value: true
+        query_params:
+            list_id: |
+                {%- if args.task_id is not defined -%}
+                    {%- if args.list_id is defined -%}
+                        {{args.list_id}}
+                    {%- else -%}
+                        {{env.WUNDER_LIST_ID}}
+                    {%- endif -%}
+                {%- endif -%}
+            task_id: |
+                {%- if args.task_id is defined -%}
+                    {{args.task_id}}
+                {%- endif -%}
 
 # Scripts
     - list:
@@ -109,8 +155,6 @@ subcommands:
 
     - todo:
         about: create a task
-        path: tasks
-        method: POST
         args:
             - list_id:
                 short: l
@@ -146,10 +190,6 @@ subcommands:
                 help: Optional list id, ignored if there's a list title
                 required: false
                 takes_value: true
-            - raw:
-                help: print as json
-                short: r
-                long: raw
             - completed:
                 short: c
                 long: completed
@@ -166,17 +206,16 @@ subcommands:
                 exit 1
             {% endif %}
 
+            export SUBTASKS=$(wunder subtasks -l "$LIST_ID")
+
+            {% set completed = "" %}
             {% if args.completed is defined %}
                 {% set completed = "-c" %}
-            {% else %}
-                {% set completed = "" %}
             {% endif %}
 
-            {% if args.raw is defined %}
-                wunder tasks_id {{completed}} $LIST_ID
-            {% else %}
-                wunder tasks_id {{completed}} $LIST_ID | jq -r 'map(.title) | .[]'
-            {% endif %}
+            export TASKS=$(wunder tasks_id {{completed}} $LIST_ID)
+
+            python {{scmd.scmd_config_base_path}}/templates/print_tasks.py
     - done:
         about: mark a task as done
         args:
@@ -193,19 +232,33 @@ subcommands:
                 takes_value: true
         script: |
             {% if args.list_id is defined -%}
-                TASKS=$(wunder tasks -r {{args.list_id}})
+                LIST_ID="{{args.list_id}}"
             {% elif args.LIST_NAME is defined %}
                 LIST_ID=$(wunder list {{args.LIST_NAME}})
-                TASKS=$(wunder tasks -r -l "$LIST_ID")
             {% elif env.WUNDER_LIST_ID is defined %}
-                TASKS=$(wunder tasks -r -l {{env.WUNDER_LIST_ID}})
+                LIST_ID="{{env.WUNDER_LIST_ID}}"
             {% endif %}
+            TASKS=$(wunder tasks_id "$LIST_ID")
             TASK=$(echo "$TASKS" | jq 'map(select(.title | test("{{args.TASK}}";"i")))|.[0]')
+
+            {% set subtask = "" %}
+            if [ "$TASK" = "null" ]
+            then
+                TASKS=$(wunder subtasks -l "$LIST_ID")
+                TASK=$(echo "$TASKS" | jq 'map(select(.title | test("{{args.TASK}}";"i")))|.[0]')
+                if [ -z "$TASK" ]
+                then
+                    echo "List not found"
+                    exit 1
+                fi
+                {% set subtask = "-s" %}
+            fi
+
             TASK_ID=$(echo "$TASK" | jq -r '.id')
             TASK_REVISION=$(echo "$TASK" | jq -r '.revision')
-            wunder update_task -c $TASK_REVISION $TASK_ID
+            wunder update_task {{subtask}} -c $TASK_REVISION $TASK_ID
     - undo:
-        about: mark a task as done
+        about: unmark a task as done
         args:
             - TASK:
                 help: A substring of the task text (it will match the first one)
