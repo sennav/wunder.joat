@@ -194,6 +194,10 @@ subcommands:
                 short: c
                 long: completed
                 help: List completed tasks
+            - tasks_only:
+                short: o
+                long: tasks-only
+                help: Do not print subtasks
         script: |
             {% if args.LIST_TITLE is defined %}
                 LIST_ID=$(wunder list {{args.LIST_TITLE}})
@@ -206,7 +210,9 @@ subcommands:
                 exit 1
             {% endif %}
 
-            export SUBTASKS=$(wunder subtasks -l "$LIST_ID")
+            {%- if args.tasks_only is not defined -%}
+                export SUBTASKS=$(wunder subtasks -l "$LIST_ID")
+            {%- endif -%}
 
             {% set completed = "" %}
             {% if args.completed is defined %}
