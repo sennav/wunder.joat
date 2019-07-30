@@ -46,7 +46,7 @@ subcommands:
                 help: List completed tasks
                 required: false
     - update_task:
-        about: update a task (PUT)
+        about: update a task (PATCH)
         path: |
             {%- if args.subtask is not defined-%}
                 tasks/{{args.TASK_ID}}
@@ -271,7 +271,7 @@ subcommands:
 
             export TASKS=$(wunder tasks_id {{completed}} $LIST_ID)
 
-            python {{scmd.scmd_config_base_path}}/templates/print_tasks.py
+            python {{scmd.scmd_config_base_path}}templates/print_tasks.py
     - done:
         about: mark a task as done
         args:
