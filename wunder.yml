@@ -80,7 +80,7 @@ subcommands:
         body:
             completed: "{% if args.completed is defined %}true{% else %}false{% endif %}"
             revision: "{{args.REVISION}}"
-            title: "{% if args.title is defined %}{{ args.title }}{% else %}[[empty]]{% endif %}"
+            title: "{{ args.title }}"
     - create_task:
         about: perform a create task request (POST)
         path: tasks
@@ -116,7 +116,7 @@ subcommands:
                 required: true
         body:
             task_id: "{{args.TASK_ID}}"
-            title: "{% if args.TITLE is defined %}{{ args.TITLE }}{% else %}[[empty]]{% endif %}"
+            title: "{{ args.TITLE }}"
     - subtasks:
         about: list subtasks
         path: subtasks
