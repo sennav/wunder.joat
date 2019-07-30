@@ -24,12 +24,11 @@ def get_subtask_map(subtasks):
 
 def main():
     tasks_str = os.getenv('TASKS')
-    subtasks_str = os.getenv('SUBTASKS', "[]")
+    subtasks_str = os.getenv('SUBTASKS') or "[]"
     tasks = json.loads(tasks_str)
     subtasks = json.loads(subtasks_str)
 
     subtask_map = get_subtask_map(subtasks)
-
     for task in tasks:
         print_color(f'• {task["title"]}', WHITE)
         for subtask in subtask_map[task['id']]:

@@ -46,7 +46,7 @@ subcommands:
                 help: List completed tasks
                 required: false
     - update_task:
-        about: update task
+        about: update a task (PUT)
         path: |
             {%- if args.subtask is not defined-%}
                 tasks/{{args.TASK_ID}}
@@ -82,7 +82,7 @@ subcommands:
             revision: "{{args.REVISION}}"
             title: "{% if args.title is defined %}{{ args.title }}{% else %}[[empty]]{% endif %}"
     - create_task:
-        about: perform a task request
+        about: perform a create task request (POST)
         path: tasks
         method: POST
         args:
@@ -190,7 +190,8 @@ subcommands:
             {% else %}
                 LIST_ID="{{env.WUNDER_LIST_ID}}"
             {% endif %}
-            wunder create_task -l "$LIST_ID" "{{args.TITLE}}"
+            wunder create_task -q -l "$LIST_ID" "{{args.TITLE}}"
+            wunder tasks -l "$LIST_ID"
 
     - subtask:
         about: create a subtask
@@ -238,11 +239,11 @@ subcommands:
             - completed:
                 short: c
                 long: completed
-                help: List completed tasks
-            - tasks_only:
-                short: o
-                long: tasks-only
-                help: Do not print subtasks
+                help: List completed tasks and subtasks
+            - subtasks:
+                short: s
+                long: subtasks
+                help: Show subtasks
         script: |
             {% if args.LIST_TITLE is defined %}
                 LIST_ID=$(wunder list {{args.LIST_TITLE}})
@@ -255,8 +256,12 @@ subcommands:
                 exit 1
             {% endif %}
 
-            {%- if args.tasks_only is not defined -%}
-                export SUBTASKS=$(wunder subtasks -l "$LIST_ID")
+            {%- if args.subtasks is defined -%}
+                {% if args.completed is defined %}
+                    export SUBTASKS=$(wunder subtasks -l "$LIST_ID")
+                {% else %}
+                    export SUBTASKS=$(wunder subtasks -l "$LIST_ID" | jq 'map(select(.completed == false))')
+                {% endif %}
             {%- endif -%}
 
             {% set completed = "" %}
@@ -292,7 +297,6 @@ subcommands:
             TASKS=$(wunder tasks_id "$LIST_ID")
             TASK=$(echo "$TASKS" | jq 'map(select(.title | test("{{args.TASK}}";"i")))|.[0]')
 
-            {% set subtask = "" %}
             if [ "$TASK" = "null" ]
             then
                 TASKS=$(wunder subtasks -l "$LIST_ID")
@@ -302,12 +306,17 @@ subcommands:
                     echo "List not found"
                     exit 1
                 fi
-                {% set subtask = "-s" %}
+                SUBTASK=true
             fi
 
             TASK_ID=$(echo "$TASK" | jq -r '.id')
             TASK_REVISION=$(echo "$TASK" | jq -r '.revision')
-            wunder update_task {{subtask}} -c $TASK_REVISION $TASK_ID
+            if [ -z "$SUBTASK" ]; then
+                wunder update_task -q -c $TASK_REVISION $TASK_ID
+            else
+                wunder update_task -q -s -c $TASK_REVISION $TASK_ID
+            fi
+            wunder tasks -l "$LIST_ID"
     - undo:
         about: unmark a task as done
         args:
