@@ -1,6 +1,6 @@
 # Wunder CLI
 
-Config files for a joat based cli, you don't know what is joat? <scared_face_emoji>
+Config files for a joat based cli, you don't know what is joat? 😱
 get your shit together and go [read about joat!](https://github.com/sennav/joat)
 
 ## Instalation
