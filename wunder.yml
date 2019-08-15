@@ -176,6 +176,8 @@ subcommands:
                 help: List id, ignored if list title is defined
                 required: false
                 takes_value: true
+                conflicts_with:
+                    - LIST_TITLE
             - TITLE:
                 help: What to do?
                 required: true
@@ -286,6 +288,8 @@ subcommands:
                 long: list_id
                 required: false
                 takes_value: true
+                conflicts_with:
+                    - LIST_NAME
         script: |
             {% if args.list_id is defined -%}
                 LIST_ID="{{args.list_id}}"
