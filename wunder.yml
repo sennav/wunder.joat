@@ -18,6 +18,7 @@ subcommands:
     - lists:
         about: get lists
         path: lists
+
     - list_id:
         about: get list by id
         path: lists/{{args.LIST_ID}}
@@ -25,6 +26,17 @@ subcommands:
             - LIST_ID:
                 help: List id
                 required: true
+
+    - reminders_by_id:
+        about: Get reminders by list id
+        path: reminders
+        query_params:
+            list_id: "{{args.LIST_ID}}"
+        args:
+            - LIST_ID:
+                help: List id
+                required: true
+
     - tasks_id:
         about: get tasks by list id
         path: tasks
@@ -45,6 +57,7 @@ subcommands:
                 long: completed
                 help: List completed tasks
                 required: false
+
     - update_task:
         about: update a task (PATCH)
         path: |
@@ -81,6 +94,7 @@ subcommands:
             completed: "{% if args.completed is defined %}true{% else %}false{% endif %}"
             revision: "{{args.REVISION}}"
             title: "{{ args.title }}"
+
     - create_task:
         about: perform a create task request (POST)
         path: tasks
@@ -103,6 +117,7 @@ subcommands:
                     {{env.WUNDER_LIST_ID}}
                 {%- endif -%}
             title: "{{ args.TITLE }}"
+
     - create_subtask:
         about: perform a subtask request
         path: subtasks
@@ -117,6 +132,7 @@ subcommands:
         body:
             task_id: "{{args.TASK_ID}}"
             title: "{{ args.TITLE }}"
+
     - subtasks:
         about: list subtasks
         path: subtasks
@@ -272,6 +288,7 @@ subcommands:
             {% endif %}
 
             export TASKS=$(wunder tasks_id {{completed}} $LIST_ID)
+            export REMINDERS=$(wunder reminders_by_id $LIST_ID)
 
             python {{scmd.scmd_config_base_path}}templates/print_tasks.py
     - done:
@@ -338,3 +355,29 @@ subcommands:
             TASK_ID=$(echo "$TASK" | jq -r '.id')
             TASK_REVISION=$(echo "$TASK" | jq -r '.revision')
             wunder update_task $TASK_REVISION $TASK_ID
+
+    - reminders:
+        about: Get reminders by list id or env variable
+        args:
+            - LIST_TITLE:
+                help: Optional list name
+                required: false
+                takes_value: true
+            - list_id:
+                help: Optional list id
+                short: -l
+                long: list_id
+                required: false
+                takes_value: true
+        script: |
+            {% if args.LIST_TITLE is defined %}
+                LIST_ID="LIST_ID=$(wunder list {{args.LIST_TITLE}})"
+            {% elif args.list_id is defined %}
+                LIST_ID="{{args.list_id}}"
+            {% elif env.WUNDER_LIST_ID is defined %}
+                LIST_ID="{{env.WUNDER_LIST_ID}}"
+            {% else %}
+                echo "No list id provided"
+                exit 1
+            {% endif %}
+            wunder reminders_by_id "$LIST_ID"
